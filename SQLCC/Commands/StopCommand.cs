@@ -7,28 +7,29 @@ using SQLCC.Core.Interfaces;
 
 namespace SQLCC.Commands
 {
-   public class StopCommand : ICommand
-   {
-      private DbProvider _dbProvider;
-      private OutputProvider _outputProvider;
-      private string _traceName;
+    public class StopCommand : ICommand
+    {
+        private DbProvider _dbProvider;
+        private OutputProvider _outputProvider;
+        private string _traceName;
 
-      public StopCommand(DbProvider dbProvider, OutputProvider outputProvider, string traceName)
-      {
-         this._dbProvider = dbProvider;
-         this._outputProvider = outputProvider;
-         this._traceName = traceName;
-      }
+        public StopCommand(DbProvider dbProvider, OutputProvider outputProvider, string traceName)
+        {
+            this._dbProvider = dbProvider;
+            this._outputProvider = outputProvider;
+            this._traceName = traceName;
+        }
 
-      public void Execute()
-      {
-         if (!_dbProvider.IsTraceRunning(_traceName))
-         {
-            throw new ApplicationException(
-               "You must first start a trace. The last trace found was already completed.");
-         }
+        public void Execute()
+        {
+            if (!_dbProvider.IsTraceRunning(_traceName))
+            {
+                throw new ApplicationException("You must first start a trace. The last trace found was already completed.");
+            }
 
-         _dbProvider.StopTrace(_traceName);
-      }
-   }
+            Console.WriteLine("Stopping trace...");
+            _dbProvider.StopTrace(_traceName);
+            Console.WriteLine("Trace stopped.");
+        }
+    }
 }

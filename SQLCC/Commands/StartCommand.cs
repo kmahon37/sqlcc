@@ -7,28 +7,30 @@ using SQLCC.Core.Interfaces;
 
 namespace SQLCC.Commands
 {
-   public class StartCommand : ICommand
-   {
-      private OutputProvider _outputProvider;
-      private DbProvider _dbProvider;
-      private string _traceName;
+    public class StartCommand : ICommand
+    {
+        private OutputProvider _outputProvider;
+        private DbProvider _dbProvider;
+        private string _traceName;
 
-      public StartCommand(OutputProvider outputProvider, DbProvider dbProvider, string traceName)
-      {
-         _outputProvider = outputProvider;
-         _dbProvider = dbProvider;
-         _traceName = traceName;
-      }
+        public StartCommand(OutputProvider outputProvider, DbProvider dbProvider, string traceName)
+        {
+            _outputProvider = outputProvider;
+            _dbProvider = dbProvider;
+            _traceName = traceName;
+        }
 
-      public void Execute()
-      {
-         if (_dbProvider.IsTraceRunning(_traceName))
-         {
-            throw new ApplicationException("You cannot start more than one trace at a time!");
-         }
+        public void Execute()
+        {
+            if (_dbProvider.IsTraceRunning(_traceName))
+            {
+                throw new ApplicationException("You cannot start more than one trace at a time!");
+            }
 
-         _outputProvider.SetUp(_traceName);
-         _dbProvider.StartTrace(_traceName);
-      }
-   }
+            Console.WriteLine("Starting trace...");
+            _outputProvider.SetUp(_traceName);
+            _dbProvider.StartTrace(_traceName);
+            Console.WriteLine("Trace started.");
+        }
+    }
 }

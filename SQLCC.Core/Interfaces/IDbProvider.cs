@@ -3,16 +3,18 @@ using SQLCC.Core.Objects;
 
 namespace SQLCC.Core.Interfaces
 {
-   internal interface IDbProvider : IExtension
-   {
-      void StartTrace(string traceName);
+    internal interface IDbProvider : IExtension
+    {
+        void StartTrace(string traceName);
 
-      void StopTrace(string traceName);
+        void StopTrace(string traceName);
 
-      bool IsTraceRunning(string traceName);
+        bool IsTraceRunning(string traceName);
 
-      List<DbCodeSegment> GetTraceCodeSegments(string traceName);
+        List<DbCodeSegment> GetTraceCodeSegments(string traceName);
 
-      List<DbObject> GetAllObjects();
-   }
+        List<DbObject> GetAllObjects();
+
+        void SetSpecificObjectNameForTesting(string objectName);
+    }
 }

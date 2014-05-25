@@ -8,99 +8,105 @@ using SQLCC.Core.Objects;
 
 namespace SQLCC
 {
-   public class CodeCoverageProcessor 
-   {
-      private readonly DbTraceCodeFormatter _dbCodeFormatter;
-      private readonly HighlightCodeProvider _highlightCodeProvider;
-      private readonly int _highlightMarkUpLength;
-      private readonly DataScrubber _dataScrubber;
+    public class CodeCoverageProcessor 
+    {
+        private readonly DbTraceCodeFormatter _dbCodeFormatter;
+        private readonly HighlightCodeProvider _highlightCodeProvider;
+        private readonly int _highlightMarkUpLength;
+        private readonly DataScrubber _dataScrubber;
 
-      public CodeCoverageProcessor(DbTraceCodeFormatter dbCodeFormatter, HighlightCodeProvider highlightCodeProvider)
-      {
-         _dbCodeFormatter = dbCodeFormatter;
-         _highlightCodeProvider = highlightCodeProvider;
-         _dataScrubber = new DataScrubber(dbCodeFormatter);
-         _highlightMarkUpLength = _dbCodeFormatter.StartHighlightMarkUp.Length + _dbCodeFormatter.EndHighlightMarkUp.Length;
-      }
+        public CodeCoverageProcessor(DbTraceCodeFormatter dbCodeFormatter, HighlightCodeProvider highlightCodeProvider)
+        {
+            _dbCodeFormatter = dbCodeFormatter;
+            _highlightCodeProvider = highlightCodeProvider;
+            _dataScrubber = new DataScrubber(dbCodeFormatter, "floc.scrub");
+            _highlightMarkUpLength = _dbCodeFormatter.StartHighlightMarkUp.Length + _dbCodeFormatter.EndHighlightMarkUp.Length;
+        }
 
-      private List<DbCodeSegment> ProcessRawCodeSegments(MatchCollection rawCodeSegments)
-      {
-         var coveredSegments = new List<DbCodeSegment>();
-          var countToSubtractFromPosition = 0;
-         for (var i = 0; i < rawCodeSegments.Count; i++)
-         {
-            var codeSegment = rawCodeSegments[i];
-            var dbCodeSegment = new DbCodeSegment();
-            dbCodeSegment.LinesOfCode = codeSegment.Groups[1].Value.Split('\n').Length;
-            dbCodeSegment.StartByte = codeSegment.Index - countToSubtractFromPosition;
-            dbCodeSegment.EndByte = dbCodeSegment.StartByte + codeSegment.Length - _highlightMarkUpLength;
-            coveredSegments.Add(dbCodeSegment);
-            countToSubtractFromPosition += _highlightMarkUpLength;
-         }
-         return coveredSegments;
-      }
+        private List<DbCodeSegment> ProcessRawCodeSegments(MatchCollection rawCodeSegments)
+        {
+            var coveredSegments = new List<DbCodeSegment>();
+            var countToSubtractFromPosition = 0;
+            for (var i = 0; i < rawCodeSegments.Count; i++)
+            {
+                var codeSegment = rawCodeSegments[i];
+                var dbCodeSegment = new DbCodeSegment();
+                dbCodeSegment.LinesOfCode = codeSegment.Groups[1].Value.Split('\n').Length;
+                dbCodeSegment.StartByte = codeSegment.Index - countToSubtractFromPosition;
+                dbCodeSegment.EndByte = dbCodeSegment.StartByte + codeSegment.Length - _highlightMarkUpLength;
+                coveredSegments.Add(dbCodeSegment);
+                countToSubtractFromPosition += _highlightMarkUpLength;
+            }
+            return coveredSegments;
+        }
 
-      private MatchCollection GetRawHighlightedCodeSegments(string code)
-      {
-         return Regex.Matches(code, string.Format("{0}(.*?){1}", _dbCodeFormatter.StartHighlightMarkUp, _dbCodeFormatter.EndHighlightMarkUp), RegexOptions.Singleline);
-      }
+        private MatchCollection GetRawHighlightedCodeSegments(string code)
+        {
+            return Regex.Matches(code, string.Format("{0}(.*?){1}", _dbCodeFormatter.StartHighlightMarkUp, _dbCodeFormatter.EndHighlightMarkUp), RegexOptions.Singleline);
+        }
 
-      private List<DbCodeSegment> ProcessHighlightedCode(string highlightedCode)
-      {
-         return ProcessRawCodeSegments(GetRawHighlightedCodeSegments(highlightedCode));
-      }
+        private List<DbCodeSegment> ProcessHighlightedCode(string highlightedCode)
+        {
+            return ProcessRawCodeSegments(GetRawHighlightedCodeSegments(highlightedCode));
+        }
       
-      public DbObject ProcessObjectCoverage(DbObject dbObject)
-      {
-         var dbObjectClone = dbObject.Get();
+        public DbObject ProcessObjectCoverage(DbObject dbObject)
+        {
+            var dbObjectClone = dbObject.Get();
 
-         if (dbObjectClone.Code == null)
+            if (dbObjectClone.Code == null)
             return dbObjectClone;
 
-         if (dbObjectClone.CoveredSegments.Count > 0)
-         {
-            var codeWithHighlights = _dbCodeFormatter.FormatCodeWithHighlights(dbObjectClone.Code,
-                                                                               dbObjectClone.CoveredSegments);
-            dbObjectClone.CoveredSegments = ProcessHighlightedCode(codeWithHighlights);
-
-            var functionalHighlightedCode = _dataScrubber.Scrub(codeWithHighlights, "floc.scrub");
-            var functionalSegments = ProcessHighlightedCode(functionalHighlightedCode);
-            foreach (var functionalSegment in functionalSegments)
+            if (dbObjectClone.CoveredSegments.Count > 0)
             {
-               dbObjectClone.CoveredCharacters += functionalSegment.EndByte - functionalSegment.StartByte;
-               dbObjectClone.CoveredLinesOfCode += functionalSegment.LinesOfCode;
+                var codeWithHighlights = _dbCodeFormatter.FormatCodeWithHighlights(dbObjectClone.Code,
+                                                                                    dbObjectClone.CoveredSegments);
+                dbObjectClone.CoveredSegments = ProcessHighlightedCode(codeWithHighlights);
+
+                var functionalHighlightedCode = _dataScrubber.Scrub(codeWithHighlights);
+                var functionalSegments = ProcessHighlightedCode(functionalHighlightedCode);
+                foreach (var functionalSegment in functionalSegments)
+                {
+                    dbObjectClone.CoveredCharacters += functionalSegment.EndByte - functionalSegment.StartByte;
+                    dbObjectClone.CoveredLinesOfCode += functionalSegment.LinesOfCode;
+                }
             }
-         }
 
-         var functionalCode = _dataScrubber.Scrub(dbObjectClone.Code, "floc.scrub");
+            var functionalCode = _dataScrubber.Scrub(dbObjectClone.Code);
 
-         dbObjectClone.TotalLoc = dbObjectClone.Code.Split('\n').Length;
-         dbObjectClone.TotalCharacters = dbObjectClone.Code.Length;
+            dbObjectClone.TotalLoc = dbObjectClone.Code.Split('\n').Length;
+            dbObjectClone.TotalCharacters = dbObjectClone.Code.Length;
 
-         dbObjectClone.TotalFloc = functionalCode.Split('\n').Length;
-         dbObjectClone.TotalFunctionalCharacters = functionalCode.Length;
+            dbObjectClone.TotalFloc = functionalCode.Split('\n').Length;
+            dbObjectClone.TotalFunctionalCharacters = functionalCode.Length;
 
-         dbObjectClone.CoveredPercent = (decimal)dbObjectClone.CoveredCharacters / dbObjectClone.TotalFunctionalCharacters;
+            dbObjectClone.CoveredPercent = (decimal)dbObjectClone.CoveredCharacters / dbObjectClone.TotalFunctionalCharacters;
          
-         return dbObjectClone;
-      }
+            return dbObjectClone;
+        }
 
-      public void ProcessAllCoverage(DbCodeCoverage codeCover)
-      {
-         foreach (var obj in codeCover.TotalObjects)
-         {
-            obj.CoveredSegments = codeCover.TraceCodeSegments.Where(p => p.ObjectName.Equals(obj.Name)).ToList();
-            obj.Set(ProcessObjectCoverage(obj));
-            obj.CodeHighlighted = _highlightCodeProvider.HighlightCode(obj.Code, obj.CoveredSegments);
+        public void ProcessAllCoverage(DbCodeCoverage codeCover)
+        {
+            var total = codeCover.TotalObjects.Count;
+            int count = 0;
 
-            codeCover.TotalLoc += obj.TotalLoc;
-            codeCover.TotalFloc += obj.TotalFloc;
-            codeCover.TotalCharacters += obj.TotalCharacters;
-            codeCover.TotalFunctionalCharacters += obj.TotalFunctionalCharacters;
-            codeCover.CoveredCharacters += (int)Math.Round(obj.TotalFunctionalCharacters * obj.CoveredPercent);
-            codeCover.CoveredLinesOfCode += (int)Math.Round(obj.TotalLoc * obj.CoveredPercent);
-         }
-         codeCover.CoveredPercent = ((decimal)codeCover.CoveredCharacters / codeCover.TotalFunctionalCharacters);
-      }
-   }
+            foreach (var obj in codeCover.TotalObjects)
+            {
+                count += 1;
+                Console.WriteLine("        Parsing object ({0} of {1}):  {2}", count, total, obj.Name);
+
+                obj.CoveredSegments = codeCover.TraceCodeSegments.Where(p => p.ObjectName.Equals(obj.Name)).ToList();
+                obj.Set(ProcessObjectCoverage(obj));
+                obj.CodeHighlighted = _highlightCodeProvider.HighlightCode(obj.Code, obj.CoveredSegments);
+
+                codeCover.TotalLoc += obj.TotalLoc;
+                codeCover.TotalFloc += obj.TotalFloc;
+                codeCover.TotalCharacters += obj.TotalCharacters;
+                codeCover.TotalFunctionalCharacters += obj.TotalFunctionalCharacters;
+                codeCover.CoveredCharacters += (int)Math.Round(obj.TotalFunctionalCharacters * obj.CoveredPercent);
+                codeCover.CoveredLinesOfCode += (int)Math.Round(obj.TotalLoc * obj.CoveredPercent);
+            }
+            codeCover.CoveredPercent = ((decimal)codeCover.CoveredCharacters / codeCover.TotalFunctionalCharacters);
+        }
+    }
 }

@@ -8,7 +8,7 @@
 (end)([\s]*(--.*)*[\s]*){0}	$1{0}$2	Cover up until end statement.
 (([\s]*ELSE[\s]*)[\s]*(--.*)*[\s]*){0}	{0}$1	If there is an ELSE statemenet that was hit, cover this as well.
 {1}([\s]*(declare[\s]+.+)+[\n\r]+([\s]*declare[\s]+.+)*[\s]*)	$1{1}	DECLARE statements are not covered since profiler does not capture them if there is no default value.
-([\s]*(declare[\s]+.+)+[\n\r]+([\s]*declare[\s]+.+)*[\s]*){0}	{0}$1	DECLARE statements are not covered since profiler does not capture them if there is no default value.
+(?>[\s]*(declare[\s]+.+)+[\n\r]+([\s]*declare[\s]+.+)*[\s]*){0}	{0}$1	DECLARE statements are not covered since profiler does not capture them if there is no default value.
 ([\s]+BEGIN)([\s]+([\s]*--.*[\r\n]+)*[\s]+){0}	$1{0}$2	Include white space up until the BEGIN statement
 {1}(([\s]*--.*[\r\n]+)*[\s]+){0}	$1	Comments need to be covered if that is all that is between two segments.
 {1}([\s]*[\S]+:[\s]*){0}	$1	If there is a bookmark between code coverage that was not hit, include it.

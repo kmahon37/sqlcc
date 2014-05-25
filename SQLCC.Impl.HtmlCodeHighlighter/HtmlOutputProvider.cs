@@ -10,112 +10,117 @@ using SQLCC.Impl.HtmlCodeHighlighter.Helpers;
 
 namespace SQLCC.Impl.HtmlCodeHighlighter
 {
-   public class HtmlOutputProvider : OutputProvider
-   {
-      private readonly string _outputDir;
+    public class HtmlOutputProvider : OutputProvider
+    {
+        private readonly string _outputDir;
 
-      public HtmlOutputProvider(string outputDir)
-      {
-         _outputDir = outputDir;
-      }
+        public HtmlOutputProvider(string outputDir)
+        {
+            _outputDir = outputDir;
+        }
 
-      public override bool SetUp(string traceName)
-      {
-         var assembly = Assembly.GetExecutingAssembly();
-         var zipStream = assembly.GetManifestResourceStream("SQLCC.Impl.HtmlCodeHighlighter.sqlcc_output.zip");
+        public override bool SetUp(string traceName)
+        {
+            var assembly = Assembly.GetExecutingAssembly();
+            var zipStream = assembly.GetManifestResourceStream("SQLCC.Impl.HtmlCodeHighlighter.sqlcc_output.zip");
 
-         using (var zip = ZipFile.Read(zipStream))
-         {
-            zip.ExtractAll(_outputDir, ExtractExistingFileAction.DoNotOverwrite);
-         }
+            using (var zip = ZipFile.Read(zipStream))
+            {
+                zip.ExtractAll(_outputDir, ExtractExistingFileAction.DoNotOverwrite);
+            }
 
-         WriteEmptyRunToCoverageFile(traceName);
+            WriteEmptyRunToCoverageFile(traceName);
 
-         return true;
-      }
+            return true;
+        }
 
-      private List<DbCodeCoverage> GetCodeCoverageFile(string filePath)
-      {
-         var codeCoverages = new List<DbCodeCoverage>();
-         if (File.Exists(filePath))
-         {
-            var currentJsFile = File.ReadAllText(filePath).Replace("var sqlcc=", "");
-            codeCoverages = JsonHelper.JsonDeserialize<List<DbCodeCoverage>>(currentJsFile);
-         }
-         return codeCoverages;
-      }
+        private List<DbCodeCoverage> GetCodeCoverageFile(string filePath)
+        {
+            var codeCoverages = new List<DbCodeCoverage>();
+            if (File.Exists(filePath))
+            {
+                var currentJsFile = File.ReadAllText(filePath).Replace("var sqlcc=", "");
+                codeCoverages = JsonHelper.JsonDeserialize<List<DbCodeCoverage>>(currentJsFile);
+            }
+            return codeCoverages;
+        }
 
-      private void SaveCodeCoverageFile(List<DbCodeCoverage> codeCoverages, string filePath)
-      {
-         var codeCoverJs = "var sqlcc=" + JsonHelper.JsonSerializer(codeCoverages);
-         File.WriteAllText(filePath, codeCoverJs);
-      }
+        private void SaveCodeCoverageFile(List<DbCodeCoverage> codeCoverages, string filePath)
+        {
+            var codeCoverJs = "var sqlcc=" + JsonHelper.JsonSerializer(codeCoverages);
+            File.WriteAllText(filePath, codeCoverJs);
+        }
 
-      private void WriteAllDbObjectFiles(List<DbObject> objects, string baseLocation, string codeCoverageLocation)
-      {
-         var template = File.ReadAllText(Path.Combine(baseLocation, "template.html"));
-         
-         foreach (var obj in objects)
-         {
-            File.WriteAllText(Path.Combine(codeCoverageLocation, obj.Name + ".html"), template.Replace("[CODE]", obj.CodeHighlighted));
-         }
-      }
+        private void WriteAllDbObjectFiles(List<DbObject> objects, string baseLocation, string codeCoverageLocation)
+        {
+            var template = File.ReadAllText(Path.Combine(baseLocation, "template.html"));
+            int total = objects.Count;
+            int count = 0;
 
-      private void WriteEmptyRunToCoverageFile(string traceName)
-      {
-         var codeCoverageFilePath = Path.Combine(_outputDir, "sqlcc.js");
-         var codeCoverages = GetCodeCoverageFile(codeCoverageFilePath);
-         codeCoverages.Add(new DbCodeCoverage() { Name = traceName, StartDate = DateTime.Now });
-         SaveCodeCoverageFile(codeCoverages, codeCoverageFilePath);
-      }
+            foreach (var obj in objects)
+            {
+                count += 1;
+                Console.WriteLine("        Writing file ({0} of {1}):  {2}.html", count, total, obj.Name);
 
-      private void WriteCodeCoverageMetaData(DbCodeCoverage codeCoverage, string location)
-      {
-         var json = "sqlcc_objects['" + codeCoverage.Name + "']=" + JsonHelper.JsonSerializer(codeCoverage.TotalObjects);
-         File.WriteAllText(Path.Combine(location, "sqlcc.js"), json);
-      }
+                File.WriteAllText(Path.Combine(codeCoverageLocation, obj.Name + ".html"), template.Replace("[CODE]", obj.CodeHighlighted));
+            }
+        }
 
-      public void RewriteLastRunWithCoverageData(DbCodeCoverage codeCoverage)
-      {
-         var codeCoverageFilePath = Path.Combine(_outputDir, "sqlcc.js");
-         var codeCoverages = GetCodeCoverageFile(codeCoverageFilePath);
+        private void WriteEmptyRunToCoverageFile(string traceName)
+        {
+            var codeCoverageFilePath = Path.Combine(_outputDir, "sqlcc.js");
+            var codeCoverages = GetCodeCoverageFile(codeCoverageFilePath);
+            codeCoverages.Add(new DbCodeCoverage() { Name = traceName, StartDate = DateTime.Now });
+            SaveCodeCoverageFile(codeCoverages, codeCoverageFilePath);
+        }
 
-         var lastCodeCoverage = codeCoverages.LastOrDefault();
+        private void WriteCodeCoverageMetaData(DbCodeCoverage codeCoverage, string location)
+        {
+            var json = "sqlcc_objects['" + codeCoverage.Name + "']=" + JsonHelper.JsonSerializer(codeCoverage.TotalObjects);
+            File.WriteAllText(Path.Combine(location, "sqlcc.js"), json);
+        }
 
-         codeCoverage.Name = lastCodeCoverage.Name;
-         codeCoverage.StartDate = lastCodeCoverage.StartDate;
+        public void RewriteLastRunWithCoverageData(DbCodeCoverage codeCoverage)
+        {
+            var codeCoverageFilePath = Path.Combine(_outputDir, "sqlcc.js");
+            var codeCoverages = GetCodeCoverageFile(codeCoverageFilePath);
 
-         codeCoverages.RemoveAt(codeCoverages.Count - 1);
-         codeCoverages.Add(codeCoverage);
-         SaveCodeCoverageFile(codeCoverages, codeCoverageFilePath);
-      }
+            var lastCodeCoverage = codeCoverages.LastOrDefault();
 
-      public override bool SaveResults(DbCodeCoverage codeCoverage)
-      {
-         codeCoverage.EndDate = DateTime.Now;
+            codeCoverage.Name = lastCodeCoverage.Name;
+            codeCoverage.StartDate = lastCodeCoverage.StartDate;
 
-         var baseLocation = _outputDir;
+            codeCoverages.RemoveAt(codeCoverages.Count - 1);
+            codeCoverages.Add(codeCoverage);
+            SaveCodeCoverageFile(codeCoverages, codeCoverageFilePath);
+        }
 
-         var codeCoverageLocation = Path.Combine(baseLocation, codeCoverage.Name);
+        public override bool SaveResults(DbCodeCoverage codeCoverage)
+        {
+            codeCoverage.EndDate = DateTime.Now;
 
-         Directory.CreateDirectory(codeCoverageLocation);
-         WriteCodeCoverageMetaData(codeCoverage, codeCoverageLocation);
-         WriteAllDbObjectFiles(codeCoverage.TotalObjects, baseLocation, codeCoverageLocation);
-         RewriteLastRunWithCoverageData(codeCoverage);
+            var baseLocation = _outputDir;
 
-         return true;
-      }
+            var codeCoverageLocation = Path.Combine(baseLocation, codeCoverage.Name);
+
+            Directory.CreateDirectory(codeCoverageLocation);
+            WriteCodeCoverageMetaData(codeCoverage, codeCoverageLocation);
+            WriteAllDbObjectFiles(codeCoverage.TotalObjects, baseLocation, codeCoverageLocation);
+            RewriteLastRunWithCoverageData(codeCoverage);
+
+            return true;
+        }
       
-      public override DbCodeCoverage GetStartedTraceName()
-      {
-         var codeCoverageFilePath = Path.Combine(_outputDir, "sqlcc.js");
-         var codeCoverages = GetCodeCoverageFile(codeCoverageFilePath);
-         return codeCoverages.LastOrDefault();
-      }
+        public override DbCodeCoverage GetStartedTraceName()
+        {
+            var codeCoverageFilePath = Path.Combine(_outputDir, "sqlcc.js");
+            var codeCoverages = GetCodeCoverageFile(codeCoverageFilePath);
+            return codeCoverages.LastOrDefault();
+        }
 
-      public override bool TearDown(string traceName)
-      {
-         throw new System.NotImplementedException();
-      }
-   }
+        public override bool TearDown(string traceName)
+        {
+            throw new System.NotImplementedException();
+        }
+    }
 }
